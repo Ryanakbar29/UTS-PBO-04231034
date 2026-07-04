@@ -1,0 +1,449 @@
+//======================================================
+// PAKET CUCIAN
+//======================================================
+
+class PaketCucian(
+
+    val nama: String,
+    val hargaPerKg: Double,
+    val durasiHari: Int,
+    val kuotaMesin: Int
+
+) {
+
+    init {
+
+        require(hargaPerKg > 0) {
+            "Harga per Kg harus lebih dari 0"
+        }
+
+        require(durasiHari > 0) {
+            "Durasi harus lebih dari 0"
+        }
+
+        require(kuotaMesin > 0) {
+            "Kuota mesin harus lebih dari 0"
+        }
+
+    }
+
+    override fun toString(): String {
+
+        return "$nama (Rp$hargaPerKg/kg, $durasiHari hari, Kuota:$kuotaMesin)"
+
+    }
+
+}
+
+//======================================================
+// PELANGGAN
+//======================================================
+
+class Pelanggan(
+
+    val nama: String,
+    saldoAwal: Double
+
+) {
+
+    var saldo = saldoAwal
+        private set
+
+    private val daftarCucian = mutableListOf<Cucian>()
+
+    fun topUp(nominal: Double): Boolean {
+
+        if (nominal <= 0) {
+
+            println("[GAGAL] Nominal top up tidak valid")
+
+            return false
+
+        }
+
+        saldo += nominal
+
+        println("[SUKSES] Top up Rp$nominal")
+
+        return true
+
+    }
+
+    fun bayar(nominal: Double): Boolean {
+
+        if (nominal <= 0) {
+
+            println("[GAGAL] Nominal tidak valid")
+
+            return false
+
+        }
+
+        if (saldo < nominal) {
+
+            println("[GAGAL] Saldo tidak cukup")
+
+            return false
+
+        }
+
+        saldo -= nominal
+
+        println("[SUKSES] Pembayaran Rp$nominal")
+
+        return true
+
+    }
+
+    fun tambahCucian(c: Cucian) {
+
+        daftarCucian.add(c)
+
+    }
+
+    fun hapusCucian(c: Cucian) {
+
+        daftarCucian.remove(c)
+
+    }
+
+    override fun toString(): String {
+
+        return "Pelanggan[$nama] | Saldo : Rp$saldo | Cucian : ${daftarCucian.size}"
+
+    }
+
+}
+
+//======================================================
+// CUCIAN
+//======================================================
+
+class Cucian(
+
+    val id: String,
+    val pelanggan: Pelanggan,
+    val paket: PaketCucian,
+    val beratKg: Double
+
+) {
+
+    var status = "Diterima"
+        private set
+
+    var lunas = false
+        private set
+
+    val totalHarga = beratKg * paket.hargaPerKg
+
+    private val urutanStatus = listOf(
+
+        "Diterima",
+
+        "Dicuci",
+
+        "Dikeringkan",
+
+        "Disetrika",
+
+        "Selesai"
+
+    )
+
+    fun setStatusBaru(statusBaru: String): Boolean {
+
+        val sekarang = urutanStatus.indexOf(status)
+
+        val tujuan = urutanStatus.indexOf(statusBaru)
+
+        if (tujuan == sekarang + 1) {
+
+            status = statusBaru
+
+            println("[SUKSES] Status menjadi $status")
+
+            return true
+
+        }
+
+        println("[GAGAL] Status tidak boleh melompat")
+
+        return false
+
+    }
+
+    fun setLunas() {
+
+        if (lunas) {
+
+            println("[INFO] Sudah lunas")
+
+            return
+
+        }
+
+        lunas = true
+
+        println("[SUKSES] Pembayaran lunas")
+
+    }
+
+    override fun toString(): String {
+
+        return "Cucian[$id] | $status | Rp$totalHarga | ${if(lunas) "LUNAS" else "BELUM"}"
+
+    }
+
+}
+
+//======================================================
+// KASIR
+//======================================================
+
+class Kasir(
+
+    val nama: String
+
+) {
+
+    var kuotaTersedia = 5
+        private set
+
+    var pendapatan = 0.0
+        private set
+
+    private val antrian = mutableListOf<Cucian>()
+
+    fun prosesLaundry(
+
+        pelanggan: Pelanggan,
+        paket: PaketCucian,
+        berat: Double
+
+    ): Cucian? {
+
+        println("\n===== PROSES LAUNDRY =====")
+
+        if (berat <= 0) {
+
+            println("[GAGAL] Berat cucian harus lebih dari 0 Kg")
+
+            return null
+
+        }
+
+        if (kuotaTersedia < paket.kuotaMesin) {
+
+            println("[GAGAL] Kuota mesin tidak cukup")
+
+            return null
+
+        }
+
+        val total = berat * paket.hargaPerKg
+
+        if (!pelanggan.bayar(total)) {
+
+            return null
+
+        }
+
+        val cucian =
+
+            Cucian(
+
+                "C-${System.currentTimeMillis()}",
+
+                pelanggan,
+
+                paket,
+
+                berat
+
+            )
+
+        kuotaTersedia -= paket.kuotaMesin
+
+        pendapatan += total
+
+        pelanggan.tambahCucian(cucian)
+
+        antrian.add(cucian)
+
+        println("[SUKSES] Cucian diterima")
+
+        return cucian
+
+    }
+
+    fun ambilCucian(c: Cucian): Boolean {
+
+        println("\n===== AMBIL CUCIAN =====")
+
+        if (!c.lunas) {
+
+            println("[GAGAL] Pembayaran belum lunas")
+
+            return false
+
+        }
+
+        if (c.status != "Selesai") {
+
+            println("[GAGAL] Cucian belum selesai")
+
+            return false
+
+        }
+
+        kuotaTersedia += c.paket.kuotaMesin
+
+        antrian.remove(c)
+
+        c.pelanggan.hapusCucian(c)
+
+        println("[SUKSES] Cucian berhasil diambil")
+
+        return true
+
+    }
+
+    override fun toString(): String {
+
+        return "Kasir[$nama] | Kuota:$kuotaTersedia | Pendapatan:Rp$pendapatan"
+
+    }
+
+}
+
+//======================================================
+// MAIN
+//======================================================
+
+fun main() {
+
+    val reguler = PaketCucian(
+
+        "Reguler",
+
+        8000.0,
+
+        2,
+
+        3
+
+    )
+
+    val express = PaketCucian(
+
+        "Express",
+
+        15000.0,
+
+        1,
+
+        2
+
+    )
+
+    val kasir = Kasir("Budi")
+
+    val andi = Pelanggan(
+
+        "Andi",
+
+        50000.0
+
+    )
+
+    println(reguler)
+
+    println(express)
+
+    println(kasir)
+
+    println()
+
+    println("========== TEST TOP UP ==========")
+
+    andi.topUp(-10000.0)
+
+    andi.topUp(20000.0)
+
+    println()
+
+    println("========== TEST BERAT ==========")
+
+    kasir.prosesLaundry(
+
+        andi,
+
+        reguler,
+
+        -2.0
+
+    )
+
+    println()
+
+    println("========== TRANSAKSI ==========")
+
+    val c1 = kasir.prosesLaundry(
+
+        andi,
+
+        express,
+
+        2.0
+
+    )
+
+    if (c1 != null) {
+
+        println()
+
+        println("========== TEST STATUS ==========")
+
+        c1.setStatusBaru("Selesai")
+
+        c1.setStatusBaru("Dicuci")
+
+        c1.setStatusBaru("Dikeringkan")
+
+        c1.setStatusBaru("Disetrika")
+
+        c1.setStatusBaru("Selesai")
+
+        println()
+
+        println("========== AMBIL CUCIAN ==========")
+
+        kasir.ambilCucian(c1)
+
+        c1.setLunas()
+
+        kasir.ambilCucian(c1)
+
+    }
+
+    println()
+
+    println("========== DATA AKHIR ==========")
+
+    println(andi)
+
+    println(kasir)
+
+    println()
+
+    println("========== BUKTI ENKAPSULASI ==========")
+
+    println("andi.saldo = 100000 // ERROR")
+
+    println("kasir.kuotaTersedia = 10 // ERROR")
+
+    println("c1.status = \"Selesai\" // ERROR")
+
+    println("c1.lunas = true // ERROR")
+
+}
